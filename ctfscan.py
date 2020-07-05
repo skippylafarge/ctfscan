@@ -17,8 +17,7 @@ def nmap_tcp_scan() -> list:
     filename = 'nmap-tcp-all-ports'
     tee_file = filename + '.tee'
     
-    # nmap = subprocess.run(['nmap', '-v', '-p-', '-sC', '-sV', '-oA', filename, TARGET],
-    nmap = subprocess.run(['nmap', '-v', '-p80,8080,443,8443,8000', '-oA', filename, TARGET],
+    nmap = subprocess.run(['nmap', '-v', '-p-', '-sC', '-sV', '-oA', filename, TARGET],
                           capture_output=True)
     
     return nmap.stdout.split(b'\n')
