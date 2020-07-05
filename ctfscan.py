@@ -32,12 +32,21 @@ def nmap_udp_scan() -> list:
     return nmap.stdout.split(b'\n')
 
 
-def gobuster_scan(http_ports: list): # TODO: type hinting for return
+def gobuster_scan(http_port: str) -> list: 
 
-    gobuster = subprocess.run(['gobuster', 'dir', ],
-                          capture_output=True)
+    target_with_port = TARGET + ':' + http_port
 
-    return
+    gobuster = subprocess.run(['gobuster', 'dir', '-x', 'txt', '-w',
+                               '/usr/share/wordlists/seclists/Discovery/Web-Content/common.txt',
+                               '-u', target_with_port],
+                              capture_output=True)
+
+    return gobuster.stdout.split(b'\n')
+
+
+def gobuster_scans(http_ports: list) -> list:
+
+    return list(map(lambda port: gobuster_scan(port), http_ports))
 
 
 def is_open_port(line: bytes) -> bool:
@@ -71,11 +80,15 @@ def get_lines_with_http_services(list_of_services: list) -> list:
 
     return list(filter(lambda line: is_http_service, list_of_services))
 
+def print_lines(lst: list):
+    for line in lst:
+        print(line)
+
 
 nmap_tcp_scan_results = nmap_tcp_scan()
 list_of_services = get_lines_with_open_ports(nmap_tcp_scan_results)
 list_of_http_services = get_lines_with_http_services(list_of_services)
 ports_for_http_services = get_port_numbers(list_of_http_services)
+gobuster_scan_results = gobuster_scans(ports_for_http_services)
 
-print(list_of_http_services)
-print(ports_for_http_services)
+print_lines(gobuster_scan_results)
