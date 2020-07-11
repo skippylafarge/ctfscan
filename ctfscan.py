@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+
 import subprocess
+
+import time
+
 
 PARSER = argparse.ArgumentParser(description='Run basic enumeration scans on a target.')
 
@@ -12,21 +16,15 @@ ARGS = PARSER.parse_args()
 TARGET = ARGS.host
 
 
-def nmap_tcp_scan() -> list:
+def nmap_tcp_scan() -> list: # TODO - return file object?
 
     filename = 'nmap-tcp-all-ports'
     tee_file = filename + '.tee'
-    
-    nmap = subprocess.run(['nmap', '-v', '-p-', '-sC', '-sV', '-oA', filename, TARGET],
-                          capture_output=True)
-    
-    return nmap.stdout.split(b'\n')
 
-
-def nmap_udp_scan() -> list:
+    nmap_window = subprocess.run(['/usr/bin/screen', '-t', 'nmap_tcp'])
     
-    nmap = subprocess.run(['nmap', '-v', '-sU', '-sC', '-sV', '-oA', 'nmap-udp-top-1000', TARGET],
-                         capture_output=True)
+    nmap = subprocess.run(['screen', '-p', 'nmap_tcp', '-X', 'stuff', 'nmap -v -p- -sC -sV -oA nmap-tcp-all-ports localhost | tee nmap-tcp-all-ports.tee\n'],
+                          capture_output=False)
     
     return nmap.stdout.split(b'\n')
 
@@ -83,11 +81,19 @@ def print_lines(lst: list):
     for line in lst:
         print(line)
 
+def follow_file(file_obj):
+
+    file_obj.seek(0,2)
+    while True:
+        line = file_obj.readline()
+        if not line:
+            time.sleep(0.1)
+            continue
+        yield line
 
 nmap_tcp_scan_results = nmap_tcp_scan()
-list_of_services = get_lines_with_open_ports(nmap_tcp_scan_results)
-list_of_http_services = get_lines_with_http_services(list_of_services)
-ports_for_http_services = get_port_numbers(list_of_http_services)
-gobuster_scan_results = gobuster_scans(ports_for_http_services)
+# list_of_services = get_lines_with_open_ports(nmap_tcp_scan_results)
+# list_of_http_services = get_lines_with_http_services(list_of_services)
+# ports_for_http_services = get_port_numbers(list_of_http_services)
 
-print_lines(gobuster_scan_results)
+
