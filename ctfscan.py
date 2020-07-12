@@ -11,7 +11,7 @@ from typing import TextIO
 
 PARSER = argparse.ArgumentParser(description='Run basic enumeration scans on a target.')
 
-PARSER.add_argument('--host', type=str, help='IP or hostname')
+PARSER.add_argument('--target', type=str, help='IP or hostname', required=True)
 
 ARGS = PARSER.parse_args()
 
@@ -68,9 +68,11 @@ def is_open_port(line: str) -> bool:
         'open' in line and \
         'Discovered' not in line
 
+
 def is_http_service(line: bytes) -> bool:
     
     return 'http' in line
+
 
 def open_port_handler(line: str):
 
