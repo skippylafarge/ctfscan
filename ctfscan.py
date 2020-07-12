@@ -15,20 +15,20 @@ ARGS = PARSER.parse_args()
 
 TARGET = str(ARGS.host)
 
+NMAP_FILENAME = 'nmap-tcp-all-ports'
+NMAP_TEE_FILE = NMAP_FILENAME + '.tee'
 
 def nmap_tcp_scan() -> list: # TODO - note return file object
 
-    filename = 'nmap-tcp-all-ports'
-    tee_file = filename + '.tee'
-    nmap_cmd = 'nmap -v -p- -sC -sV -oA ' + filename + ' ' + TARGET
-    tee_cmd = 'tee ' + tee_file + '\n'
+    nmap_cmd = 'nmap -v -p- -sC -sV -oA ' + NMAP_FILENAME + ' ' + TARGET
+    tee_cmd = 'tee ' + NMAP_TEE_FILE + '\n'
     stuff_cmd = nmap_cmd + ' | ' + tee_cmd + '\n'
     
     nmap_window = subprocess.run(['screen', '-t', 'nmap_tcp'])
     
     nmap = subprocess.run(['screen', '-p', 'nmap_tcp', '-X', 'stuff', stuff_cmd])
 
-    return open(tee_file, 'r', encoding='utf-8')
+    return open(NMAP_TEE_FILE, 'r', encoding='utf-8')
 
 
 def gobuster_scan(http_port: str) -> list: 
@@ -95,7 +95,10 @@ def follow_file(file_obj):
         if 'Nmap done' in line:
             break
 
-
+# Ensure the tee file exists and is empty before trying to read it
+subprocess.run(['rm', NMAP_TEE_FILE])
+subprocess.run(['touch', NMAP_TEE_FILE])
+        
 nmap_tcp_scan_file_obj = nmap_tcp_scan()
 follow_file(nmap_tcp_scan_file_obj)
 # list_of_services = get_lines_with_open_ports(nmap_tcp_scan_results)
