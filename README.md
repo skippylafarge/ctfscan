@@ -22,7 +22,7 @@ Within a `screen` session:
  - `nmap`
  - `gobuster`
 
-### Eventually...
+## Eventually...
 
  - Run more commands based on more services parsed from `nmap` output
  - Some sort of "fast" mode which will assume an open port is running the service it is traditionally known for (whereas currently the `nmap` output parsing is more conservative, waiting for confirmation)
