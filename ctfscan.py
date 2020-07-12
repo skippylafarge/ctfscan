@@ -6,6 +6,8 @@ import subprocess
 
 import time
 
+from typing import TextIO
+
 
 PARSER = argparse.ArgumentParser(description='Run basic enumeration scans on a target.')
 
@@ -15,69 +17,78 @@ ARGS = PARSER.parse_args()
 
 TARGET = str(ARGS.host)
 
-NMAP_FILENAME = 'nmap-tcp-all-ports'
-NMAP_TEE_FILE = NMAP_FILENAME + '.tee'
 
-def nmap_tcp_scan() -> list: # TODO - note return file object
+def nmap_tcp_scan() -> TextIO: # TODO - note return file object
 
-    nmap_cmd = 'nmap -v -p- -sC -sV -oA ' + NMAP_FILENAME + ' ' + TARGET
-    tee_cmd = 'tee ' + NMAP_TEE_FILE + '\n'
+    nmap_filename = 'nmap-tcp-all-ports'
+    nmap_tee_file = nmap_filename + '.tee'
+    nmap_cmd = 'nmap -v -p- -sC -sV -oA ' + nmap_filename + ' ' + TARGET
+    tee_cmd = 'tee ' + nmap_tee_file
     stuff_cmd = nmap_cmd + ' | ' + tee_cmd + '\n'
+    window_title = 'nmap_tcp'
     
-    nmap_window = subprocess.run(['screen', '-t', 'nmap_tcp'])
+    # Ensure the tee file exists and is empty before trying to read it
+    subprocess.run(['rm', nmap_tee_file])
+    subprocess.run(['touch', nmap_tee_file])
     
-    nmap = subprocess.run(['screen', '-p', 'nmap_tcp', '-X', 'stuff', stuff_cmd])
+    new_window(window_title)
+    
+    cmd_to_window(stuff_cmd, window_title)
 
-    return open(NMAP_TEE_FILE, 'r', encoding='utf-8')
+    return open(nmap_tee_file, 'r', encoding='utf-8')
 
 
 def gobuster_scan(http_port: str) -> list: 
 
     target_with_port = TARGET + ':' + http_port
+    window_title = 'gobuster-' + http_port
+    gobuster_output_file = 'gobuster-common-txt-port' + http_port
+    gobuster_cmd = 'gobuster dir -x txt -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt -u ' + target_with_port
+    tee_cmd = 'tee ' + gobuster_output_file
+    stuff_cmd = gobuster_cmd + ' | ' + tee_cmd + '\n'
 
-    gobuster = subprocess.run(['gobuster', 'dir', '-x', 'txt', '-w',
-                               '/usr/share/wordlists/seclists/Discovery/Web-Content/common.txt',
-                               '-u', target_with_port],
-                              capture_output=True)
+    new_window(window_title)
 
-    return gobuster.stdout.split(b'\n')
-
-
-def gobuster_scans(http_ports: list) -> list:
-
-    return list(map(lambda port: gobuster_scan(port), http_ports))
+    cmd_to_window(stuff_cmd, window_title)
 
 
-def is_open_port(line: bytes) -> bool:
+def new_window(window_title: str):
+
+    subprocess.run(['screen', '-t', window_title])
+
+
+def cmd_to_window(cmd: str, window_title: str):
+
+    subprocess.run(['screen', '-p', window_title, '-X', 'stuff', cmd])
+
+
+def is_open_port(line: str) -> bool:
     
     return ('tcp' in line or 'udp' in line) and \
         'open' in line and \
         'Discovered' not in line
 
-
 def is_http_service(line: bytes) -> bool:
     
-    return b'http' in line
+    return 'http' in line
 
+def open_port_handler(line: str):
 
-def get_port_number(line: bytes) -> str:
+    if is_http_service(line):
+        
+        http_service_handler(line)
 
-    return str(line.split(b'/')[0])
+        
+def http_service_handler(line: str):
 
+    http_port = get_port_number(line)
 
-def get_port_numbers(list_of_services: list) -> list:
+    gobuster_scan(http_port)
+    
 
-    return list(map(lambda line: get_port_number(line), list_of_services))
+def get_port_number(line: str) -> str:
 
-
-def get_lines_with_open_ports(list_of_lines: list) -> list:
-
-    return list(filter(lambda line: is_open_port(line), list_of_lines))
-
-
-def get_lines_with_http_services(list_of_services: list) -> list:
-
-    return list(filter(lambda line: is_http_service, list_of_services))
+    return str(line.split('/')[0])
 
 
 def follow_file(file_obj):
@@ -88,21 +99,11 @@ def follow_file(file_obj):
         if not line:
             time.sleep(0.1)
             continue
-        print(line)
         if is_open_port(line):
-            print(line)
+            open_port_handler(line)
             continue
         if 'Nmap done' in line:
             break
 
-# Ensure the tee file exists and is empty before trying to read it
-subprocess.run(['rm', NMAP_TEE_FILE])
-subprocess.run(['touch', NMAP_TEE_FILE])
         
-nmap_tcp_scan_file_obj = nmap_tcp_scan()
-follow_file(nmap_tcp_scan_file_obj)
-# list_of_services = get_lines_with_open_ports(nmap_tcp_scan_results)
-# list_of_http_services = get_lines_with_http_services(list_of_services)
-# ports_for_http_services = get_port_numbers(list_of_http_services)
-
-
+follow_file(nmap_tcp_scan())
