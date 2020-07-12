@@ -13,20 +13,22 @@ PARSER.add_argument('--host', type=str, help='IP or hostname')
 
 ARGS = PARSER.parse_args()
 
-TARGET = ARGS.host
+TARGET = str(ARGS.host)
 
 
-def nmap_tcp_scan() -> list: # TODO - return file object?
+def nmap_tcp_scan() -> list: # TODO - note return file object
 
     filename = 'nmap-tcp-all-ports'
     tee_file = filename + '.tee'
+    nmap_cmd = 'nmap -v -p- -sC -sV -oA ' + filename + ' ' + TARGET
+    tee_cmd = 'tee ' + tee_file + '\n'
+    stuff_cmd = nmap_cmd + ' | ' + tee_cmd + '\n'
+    
+    nmap_window = subprocess.run(['screen', '-t', 'nmap_tcp'])
+    
+    nmap = subprocess.run(['screen', '-p', 'nmap_tcp', '-X', 'stuff', stuff_cmd])
 
-    nmap_window = subprocess.run(['/usr/bin/screen', '-t', 'nmap_tcp'])
-    
-    nmap = subprocess.run(['screen', '-p', 'nmap_tcp', '-X', 'stuff', 'nmap -v -p- -sC -sV -oA nmap-tcp-all-ports localhost | tee nmap-tcp-all-ports.tee\n'],
-                          capture_output=False)
-    
-    return nmap.stdout.split(b'\n')
+    return open(tee_file, 'r', encoding='utf-8')
 
 
 def gobuster_scan(http_port: str) -> list: 
@@ -48,9 +50,9 @@ def gobuster_scans(http_ports: list) -> list:
 
 def is_open_port(line: bytes) -> bool:
     
-    return (b'tcp' in line or b'udp' in line) and \
-        b'open' in line and \
-        b'Discovered' not in line
+    return ('tcp' in line or 'udp' in line) and \
+        'open' in line and \
+        'Discovered' not in line
 
 
 def is_http_service(line: bytes) -> bool:
@@ -77,9 +79,6 @@ def get_lines_with_http_services(list_of_services: list) -> list:
 
     return list(filter(lambda line: is_http_service, list_of_services))
 
-def print_lines(lst: list):
-    for line in lst:
-        print(line)
 
 def follow_file(file_obj):
 
@@ -89,9 +88,16 @@ def follow_file(file_obj):
         if not line:
             time.sleep(0.1)
             continue
-        yield line
+        print(line)
+        if is_open_port(line):
+            print(line)
+            continue
+        if 'Nmap done' in line:
+            break
 
-nmap_tcp_scan_results = nmap_tcp_scan()
+
+nmap_tcp_scan_file_obj = nmap_tcp_scan()
+follow_file(nmap_tcp_scan_file_obj)
 # list_of_services = get_lines_with_open_ports(nmap_tcp_scan_results)
 # list_of_http_services = get_lines_with_http_services(list_of_services)
 # ports_for_http_services = get_port_numbers(list_of_http_services)
